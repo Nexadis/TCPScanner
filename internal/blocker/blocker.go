@@ -2,9 +2,14 @@ package blocker
 
 import (
 	"fmt"
+	"io"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"os"
 	"strings"
+
+	"github.com/Nexadis/TCPTools/internal/logger"
 )
 
 type blocklist []string
@@ -26,17 +31,56 @@ func New(fileBlocklist string, addr string) (*Blocker, error) {
 }
 
 func (bl *Blocker) Run() error {
-	return http.ListenAndServe(bl.Addr, http.HandlerFunc(bl.Block))
+	return http.ListenAndServe(bl.Addr, http.HandlerFunc(
+		WithLog(bl.Block),
+	))
 }
 
 func (bl *Blocker) Block(w http.ResponseWriter, r *http.Request) {
 	for _, blocked := range bl.blocklist {
-		if r.Host == blocked {
+		URL, err := url.Parse(blocked)
+		if err != nil {
+			logger.Log.Errorf("Invalid blocked URL: %v", blocked)
+			return
+		}
+		if r.Host == URL.Host {
+			logger.Log.Infof("Blocked %v", blocked)
 			http.Error(w, fmt.Sprintf("It's blocked %s=%s", r.Host, blocked), http.StatusLocked)
 			return
 		}
 	}
-	w.Write([]byte(`request allowed`))
+	req, err := http.NewRequest(r.Method, r.RequestURI, r.Body)
+	for k, v := range r.Header {
+		if strings.Contains(k, "Proxy") {
+			continue
+		}
+		req.Header.Add(k, v[0])
+	}
+	defer r.Body.Close()
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`error while redirect request: %v`, err), http.StatusInternalServerError)
+		return
+	}
+	client := &http.Client{}
+	dumped, err := httputil.DumpRequestOut(req, true)
+	if err != nil {
+		return
+	}
+	logger.Log.Infof(
+		"Send request:\n%v", string(dumped),
+	)
+	resp, err := client.Do(req)
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`error while redirect request: %v`, err), http.StatusInternalServerError)
+		return
+	}
+	defer resp.Body.Close()
+	w.WriteHeader(resp.StatusCode)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return
+	}
+	w.Write(body)
 }
 
 func ReadBlocklist(fileBlocklist string) (blocklist, error) {
