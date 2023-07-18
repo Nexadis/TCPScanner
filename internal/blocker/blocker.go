@@ -5,7 +5,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httputil"
-	"net/url"
 	"os"
 	"strings"
 
@@ -38,12 +37,7 @@ func (bl *Blocker) Run() error {
 
 func (bl *Blocker) Block(w http.ResponseWriter, r *http.Request) {
 	for _, blocked := range bl.blocklist {
-		URL, err := url.Parse(blocked)
-		if err != nil {
-			logger.Log.Errorf("Invalid blocked URL: %v", blocked)
-			return
-		}
-		if r.Host == URL.Host {
+		if r.Host == blocked {
 			logger.Log.Infof("Blocked %v", blocked)
 			http.Error(w, fmt.Sprintf("It's blocked %s=%s", r.Host, blocked), http.StatusLocked)
 			return
