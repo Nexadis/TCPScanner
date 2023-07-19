@@ -36,44 +36,27 @@ func (bl *Blocker) Run() error {
 }
 
 func (bl *Blocker) Block(w http.ResponseWriter, r *http.Request) {
-	for _, blocked := range bl.blocklist {
-		if r.Host == blocked {
-			logger.Log.Infof("Blocked %v", blocked)
-			http.Error(w, fmt.Sprintf("It's blocked %s=%s", r.Host, blocked), http.StatusLocked)
-			return
-		}
+	if bl.IsBlocked(r) {
+		http.Error(w, fmt.Sprintf("Blocked host: %s", r.Host), http.StatusLocked)
+		return
 	}
-	req, err := http.NewRequest(r.Method, r.RequestURI, r.Body)
-	for k, v := range r.Header {
-		if strings.Contains(k, "Proxy") {
-			continue
-		}
-		req.Header.Add(k, v[0])
-	}
-	defer r.Body.Close()
+	req, err := copyRequest(r)
 	if err != nil {
 		http.Error(w, fmt.Sprintf(`error while redirect request: %v`, err), http.StatusInternalServerError)
 		return
 	}
 	client := &http.Client{}
-	dumped, err := httputil.DumpRequestOut(req, true)
-	if err != nil {
-		return
-	}
-	logger.Log.Infof(
-		"Send request:\n%v", string(dumped),
-	)
 	resp, err := client.Do(req)
 	if err != nil {
 		http.Error(w, fmt.Sprintf(`error while redirect request: %v`, err), http.StatusInternalServerError)
 		return
 	}
 	defer resp.Body.Close()
-	w.WriteHeader(resp.StatusCode)
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return
 	}
+	w.WriteHeader(resp.StatusCode)
 	w.Write(body)
 }
 
@@ -83,4 +66,40 @@ func ReadBlocklist(fileBlocklist string) (blocklist, error) {
 		return nil, fmt.Errorf("blocklist %w", err)
 	}
 	return strings.Split(strings.Trim(string(blocklist), "\n"), "\n"), nil
+}
+
+func (bl *Blocker) IsBlocked(r *http.Request) bool {
+	for _, blocked := range bl.blocklist {
+		if r.Host == blocked {
+			logger.Log.Infof("Blocked %v", blocked)
+			return true
+		}
+	}
+	return false
+}
+
+func copyRequest(r *http.Request) (*http.Request, error) {
+	req, err := http.NewRequestWithContext(r.Context(), r.Method, r.RequestURI, r.Body)
+	if err != nil {
+		return nil, err
+	}
+	defer r.Body.Close()
+	copyHeaders(req, r)
+	dumped, err := httputil.DumpRequestOut(req, true)
+	if err != nil {
+		return nil, err
+	}
+	logger.Log.Infof(
+		"Send request:\n%v", string(dumped),
+	)
+	return req, nil
+}
+
+func copyHeaders(to, from *http.Request) {
+	for k, v := range from.Header {
+		if strings.Contains(k, "Proxy") {
+			continue
+		}
+		to.Header.Add(k, v[0])
+	}
 }
