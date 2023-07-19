@@ -70,7 +70,7 @@ func ReadBlocklist(fileBlocklist string) (blocklist, error) {
 
 func (bl *Blocker) IsBlocked(r *http.Request) bool {
 	for _, blocked := range bl.blocklist {
-		if r.Host == blocked {
+		if strings.Contains(r.Host, blocked) {
 			logger.Log.Infof("Blocked %v", blocked)
 			return true
 		}
