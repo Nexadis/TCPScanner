@@ -10,11 +10,9 @@ import (
 func WithLog(h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		dumped, err := httputil.DumpRequest(r, true)
-		if err != nil {
-			h.ServeHTTP(w, r)
-			return
+		if err == nil {
+			logger.Log.Infoln(string(dumped))
 		}
-		logger.Log.Infoln(string(dumped))
 		h.ServeHTTP(w, r)
 	}
 }
