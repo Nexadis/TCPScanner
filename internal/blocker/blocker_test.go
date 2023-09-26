@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var testbl = blocklist{
+var testbl = addrlist{
 	"google.com",
 	"ya.ru",
 	"12.163.34.11",
@@ -16,7 +16,7 @@ var testbl = blocklist{
 
 type proxyReq struct {
 	name      string
-	blocklist blocklist
+	blocklist addrlist
 	hostname  string
 	isBlocked bool
 }
@@ -38,7 +38,7 @@ var testSuites = []proxyReq{
 		name:      "Valid subdomain",
 		blocklist: testbl,
 		hostname:  "dsen.ya.ru.com",
-		isBlocked: false,
+		isBlocked: true,
 	},
 	{
 		name:      "Valid subdomain",
@@ -74,11 +74,12 @@ var testSuites = []proxyReq{
 
 func TestBlock(t *testing.T) {
 	b := &Blocker{
-		blocklist: testbl,
+		blacklist: testbl,
 	}
 	for _, test := range testSuites {
 		t.Run(test.name, func(t *testing.T) {
 			r := httptest.NewRequest(http.MethodGet, "http://"+test.hostname, nil)
+			t.Log(test.hostname)
 			assert.Equal(t, test.isBlocked, b.IsBlocked(r))
 		})
 	}

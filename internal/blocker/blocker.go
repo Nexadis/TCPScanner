@@ -9,35 +9,44 @@ import (
 	"os"
 	"strings"
 
+	"github.com/Nexadis/TCPTools/internal/blocker/config"
 	"github.com/Nexadis/TCPTools/internal/logger"
 )
 
-type blocklist []string
+type (
+	addrlist []string
+)
 
 type Blocker struct {
-	blocklist blocklist
-	Addr      string
+	blacklist addrlist
+	whitelist addrlist
+	c         *config.Config
 }
 
-func New(fileBlocklist string, addr string) (*Blocker, error) {
-	blocklist, err := ReadBlocklist(fileBlocklist)
+func New(c *config.Config) (*Blocker, error) {
+	blacklist, err := ReadList(c.BlackList)
+	if err != nil {
+		return nil, err
+	}
+	whitelist, err := ReadList(c.WhiteList)
 	if err != nil {
 		return nil, err
 	}
 	return &Blocker{
-		blocklist: blocklist,
-		Addr:      addr,
+		blacklist: blacklist,
+		whitelist: whitelist,
+		c:         c,
 	}, nil
 }
 
 func (bl *Blocker) Run() error {
-	return http.ListenAndServe(bl.Addr, http.HandlerFunc(
+	return http.ListenAndServe(bl.c.Address, http.HandlerFunc(
 		WithLog(bl.Block),
 	))
 }
 
 func (bl *Blocker) Block(w http.ResponseWriter, r *http.Request) {
-	if bl.IsBlocked(r) {
+	if bl.IsBlocked(r) || !bl.IsAllowed(r) {
 		http.Error(w, fmt.Sprintf("Blocked host: %s", r.Host), http.StatusLocked)
 		return
 	}
@@ -61,23 +70,44 @@ func (bl *Blocker) Block(w http.ResponseWriter, r *http.Request) {
 	w.Write(body)
 }
 
-func ReadBlocklist(fileBlocklist string) (blocklist, error) {
-	blocklist, err := os.ReadFile(fileBlocklist)
+func ReadList(fileWithList string) (addrlist, error) {
+	if fileWithList == "" {
+		return addrlist{}, nil
+	}
+	blocklist, err := os.ReadFile(fileWithList)
 	if err != nil {
-		return nil, fmt.Errorf("blocklist %w", err)
+		return nil, fmt.Errorf("addrlist %w", err)
 	}
 	return strings.Split(strings.Trim(string(blocklist), "\n"), "\n"), nil
 }
 
 func (bl *Blocker) IsBlocked(r *http.Request) bool {
-	for _, blocked := range bl.blocklist {
-		hostname := r.URL.Hostname()
-		blockedURL, _ := url.Parse(blocked)
-		if hostname != blockedURL.Hostname() {
+	if len(bl.blacklist) == 0 {
+		return false
+	}
+	hostname := r.URL.Hostname()
+	for _, blocked := range bl.blacklist {
+		if strings.Contains(hostname, blocked) {
 			logger.Log.Infof("Blocked %v", blocked)
 			return true
 		}
 	}
+	return false
+}
+
+func (bl *Blocker) IsAllowed(r *http.Request) bool {
+	if len(bl.whitelist) == 0 {
+		return true
+	}
+	hostname := r.URL.Hostname()
+	for _, allowed := range bl.whitelist {
+		allowedURL, _ := url.Parse(allowed)
+		if hostname == allowedURL.Hostname() {
+			return true
+		}
+	}
+
+	logger.Log.Infof("Is not allowed %v", hostname)
 	return false
 }
 
