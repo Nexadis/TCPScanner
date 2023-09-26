@@ -5,10 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/Nexadis/TCPTools/internal/logger"
-	_ "github.com/Nexadis/TCPTools/internal/logger"
 	"github.com/stretchr/testify/assert"
-	"go.uber.org/zap"
 )
 
 var testbl = addrlist{
@@ -140,8 +137,6 @@ var whiteSuites = []proxyReq{
 }
 
 func TestAllower(t *testing.T) {
-	l, _ := zap.NewDevelopment()
-	logger.Log = l.Sugar()
 	b := &Blocker{
 		whitelist: testbl,
 	}
