@@ -5,7 +5,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httputil"
-	"net/url"
 	"os"
 	"strings"
 
@@ -85,9 +84,9 @@ func (bl *Blocker) IsBlocked(r *http.Request) bool {
 	if len(bl.blacklist) == 0 {
 		return false
 	}
-	hostname := r.URL.Hostname()
+	hostname := strings.TrimSpace(r.URL.Hostname())
 	for _, blocked := range bl.blacklist {
-		if strings.Contains(hostname, blocked) {
+		if strings.HasSuffix(hostname, blocked) {
 			logger.Log.Infof("Blocked %v", blocked)
 			return true
 		}
@@ -99,10 +98,10 @@ func (bl *Blocker) IsAllowed(r *http.Request) bool {
 	if len(bl.whitelist) == 0 {
 		return true
 	}
-	hostname := r.URL.Hostname()
+	hostname := strings.TrimSpace(r.URL.Hostname())
 	for _, allowed := range bl.whitelist {
-		allowedURL, _ := url.Parse(allowed)
-		if hostname == allowedURL.Hostname() {
+		fmt.Printf("CMP %s %s\n", hostname, allowed)
+		if strings.HasSuffix(hostname, allowed) {
 			return true
 		}
 	}
