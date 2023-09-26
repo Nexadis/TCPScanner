@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httputil"
+	"net/url"
 	"os"
 	"strings"
 
@@ -70,7 +71,9 @@ func ReadBlocklist(fileBlocklist string) (blocklist, error) {
 
 func (bl *Blocker) IsBlocked(r *http.Request) bool {
 	for _, blocked := range bl.blocklist {
-		if strings.Contains(r.Host, blocked) {
+		hostname := r.URL.Hostname()
+		blockedURL, _ := url.Parse(blocked)
+		if hostname != blockedURL.Hostname() {
 			logger.Log.Infof("Blocked %v", blocked)
 			return true
 		}

@@ -11,6 +11,7 @@ import (
 var testbl = blocklist{
 	"google.com",
 	"ya.ru",
+	"12.163.34.11",
 }
 
 type proxyReq struct {
@@ -36,7 +37,19 @@ var testSuites = []proxyReq{
 	{
 		name:      "Valid subdomain",
 		blocklist: testbl,
+		hostname:  "dsen.ya.ru.com",
+		isBlocked: false,
+	},
+	{
+		name:      "Valid subdomain",
+		blocklist: testbl,
 		hostname:  "dsen.ya.ru",
+		isBlocked: true,
+	},
+	{
+		name:      "Valid subdomain with port",
+		blocklist: testbl,
+		hostname:  "dsen.ya.ru:8080",
 		isBlocked: true,
 	},
 	{
@@ -50,6 +63,12 @@ var testSuites = []proxyReq{
 		blocklist: testbl,
 		hostname:  "aaksjdflasjdf;lkjsaldfkjalsk;jdfjhalkjher-[sfafj234ja;sdfkj]",
 		isBlocked: false,
+	},
+	{
+		name:      "Valid IP with port",
+		blocklist: testbl,
+		hostname:  "12.163.34.11:23432",
+		isBlocked: true,
 	},
 }
 
